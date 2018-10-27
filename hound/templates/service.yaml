@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "hound.fullname" . }}
+  labels:
+    app: {{ template "hound.name" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ template "hound.name" . }}
+    release: {{ .Release.Name }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: hound-http

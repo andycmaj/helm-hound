@@ -1,0 +1,59 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ template "hound.fullname" . }}
+  labels:
+    app: {{ template "hound.name" . }}
+    chart: {{ template "hound.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "hound.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/houndconfig: {{ include (print $.Template.BasePath "/configmap_hound.tpl") . | sha256sum }}
+      labels:
+        app: {{ template "hound.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        # Hound Data
+        - name: hound-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "hound.fullname" .) }}
+        # Repo ConfigMap
+        - name: hound-config
+          configMap:
+            name: {{ template "hound.fullname" . }}-configuration
+        # SSH ConfigMap for repository keys
+        - name: ssh-config
+          configMap:
+            name: {{ template "hound.fullname" . }}-ssh
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          args: [ "-conf", "/hound/data/config/config.json" ]
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: hound-http
+              containerPort: 6080
+          livenessProbe:
+            httpGet:
+              path: /
+              port: hound-http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: hound-http
+          volumeMounts:
+            - name: hound-data
+              mountPath: "/hound/data/index"
+            - name: hound-config
+              mountPath: "/hound/data/config"
+            - name: ssh-config
+              mountPath: "/root/.ssh"
